@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None
+
+try:
     import PyPDF2
 except ImportError:
     PyPDF2 = None
@@ -85,6 +90,69 @@ class DocumentProcessor:
         else:
             print("⚠ No documents found to process")
     
+    def _clean_text(self, text: str) -> str:
+        """
+        Clean and normalize extracted text
+        
+        Args:
+            text: Raw text
+        
+        Returns:
+            Cleaned text
+        """
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Remove extra newlines but keep some structure
+        text = re.sub(r'\n\s*\n', '\n\n', text)
+        
+        # Remove null characters and escape sequences
+        text = text.replace('\x00', '')
+        text = text.replace('\\x', '')
+        
+        # Remove special PDF characters
+        text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', text)
+        
+        return text.strip()
+    
+    def _is_valid_text(self, text: str) -> bool:
+        """
+        Check if extracted text is valid (not corrupted/encoded)
+        
+        Args:
+            text: Text to validate
+        
+        Returns:
+            True if text is valid, False if corrupted
+        """
+        if not text or not text.strip():
+            return False
+        
+        # Count valid characters (letters, numbers, spaces, common punctuation)
+        valid_chars = 0
+        
+        for c in text:
+            # Check if character is valid
+            if (c.isalnum() or 
+                c.isspace() or 
+                c in '.,!?;:\'"()-–—…«»""\'\'' or
+                ord(c) > 127):  # Allow accented characters
+                valid_chars += 1
+        
+        total_chars = len(text)
+        
+        if total_chars == 0:
+            return False
+        
+        valid_ratio = valid_chars / total_chars
+        
+        # If less than 50% valid characters, probably corrupted
+        if valid_ratio < 0.5:
+            print(f"      (Text quality: {valid_ratio*100:.1f}% - likely corrupted)")
+            return False
+        
+        return True
+    
     def _process_txt(
         self,
         file_path: Path,
@@ -92,10 +160,33 @@ class DocumentProcessor:
         chunk_overlap: int
     ) -> List[Dict[str, str]]:
         """Process text file"""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
+        print(f"   📝 Using TXT processor")
         
+        # Try different encodings
+        encodings = ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']
+        text = None
+        
+        for encoding in encodings:
+            try:
+                with open(file_path, 'r', encoding=encoding) as f:
+                    text = f.read()
+                print(f"   ✅ Loaded with encoding: {encoding}")
+                break
+            except UnicodeDecodeError:
+                continue
+        
+        if text is None:
+            print(f"   ❌ Could not decode file")
+            return []
+        
+        # Clean and chunk
+        text = self._clean_text(text)
         chunks = self._chunk_text(text, chunk_size, chunk_overlap)
+        
+        if not chunks:
+            return []
+        
+        print(f"   ✅ Created {len(chunks)} chunks")
         
         return [
             {
@@ -111,18 +202,105 @@ class DocumentProcessor:
         chunk_size: int,
         chunk_overlap: int
     ) -> List[Dict[str, str]]:
-        """Process PDF file"""
-        if PyPDF2 is None:
-            print("⚠ PyPDF2 not installed. Skipping PDF processing.")
+        """
+        Process PDF file with pdfplumber (preferred) or PyPDF2 (fallback)
+        Handles digital text PDFs only
+        """
+        text = ""
+        num_pages = 0
+        extraction_method = None
+        
+        # Try pdfplumber first (better quality for digital text)
+        if pdfplumber is not None:
+            print(f"   📄 Using pdfplumber")
+            try:
+                with pdfplumber.open(file_path) as pdf:
+                    num_pages = len(pdf.pages)
+                    print(f"   📄 PDF has {num_pages} pages")
+                    
+                    for page_num, page in enumerate(pdf.pages):
+                        try:
+                            # Extract text
+                            page_text = page.extract_text()
+                            
+                            if page_text and page_text.strip():
+                                # Validate text quality
+                                if self._is_valid_text(page_text):
+                                    text += page_text + "\n"
+                                    extraction_method = "pdfplumber"
+                                else:
+                                    print(f"   ⚠ Page {page_num + 1}: Text appears corrupted or encoded")
+                            else:
+                                print(f"   ⚠ Page {page_num + 1}: No text extracted")
+                        
+                        except Exception as e:
+                            print(f"   ⚠ Error on page {page_num + 1}: {e}")
+                            continue
+                
+                if text and text.strip():
+                    print(f"   ✅ pdfplumber extracted {len(text)} characters")
+                else:
+                    print(f"   ⚠ pdfplumber extracted no valid text, trying PyPDF2...")
+                    text = ""  # Reset for PyPDF2
+            
+            except Exception as e:
+                print(f"   ⚠ pdfplumber error: {e}, trying PyPDF2...")
+                text = ""
+        
+        # Fallback to PyPDF2
+        if not text and PyPDF2 is not None:
+            print(f"   📄 Using PyPDF2")
+            try:
+                with open(file_path, 'rb') as f:
+                    pdf_reader = PyPDF2.PdfReader(f)
+                    
+                    if not num_pages:
+                        num_pages = len(pdf_reader.pages)
+                        print(f"   📄 PDF has {num_pages} pages")
+                    
+                    for page_num, page in enumerate(pdf_reader.pages):
+                        try:
+                            page_text = page.extract_text()
+                            
+                            if page_text and page_text.strip():
+                                # Validate text quality
+                                if self._is_valid_text(page_text):
+                                    text += page_text + "\n"
+                                    extraction_method = "PyPDF2"
+                                else:
+                                    print(f"   ⚠ Page {page_num + 1}: Text appears corrupted")
+                            else:
+                                print(f"   ⚠ Page {page_num + 1}: No text extracted")
+                        
+                        except Exception as e:
+                            print(f"   ⚠ Error on page {page_num + 1}: {e}")
+                            continue
+                    
+                    if text and text.strip():
+                        print(f"   ✅ PyPDF2 extracted {len(text)} characters")
+            
+            except Exception as e:
+                print(f"   ❌ PyPDF2 error: {e}")
+                return []
+        
+        # If still no text
+        if not text or not text.strip():
+            print(f"   ❌ No valid text could be extracted from PDF")
+            print(f"   💡 PDF might be:")
+            print(f"      - Scanned (image-based) - requires OCR")
+            print(f"      - Encrypted - needs decryption")
+            print(f"      - Corrupted - try another PDF")
             return []
         
-        text = ""
-        with open(file_path, 'rb') as f:
-            pdf_reader = PyPDF2.PdfReader(f)
-            for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-        
+        # Clean and chunk
+        text = self._clean_text(text)
         chunks = self._chunk_text(text, chunk_size, chunk_overlap)
+        
+        if not chunks:
+            print(f"   ❌ No valid chunks created from PDF")
+            return []
+        
+        print(f"   ✅ Created {len(chunks)} chunks ({extraction_method})")
         
         return [
             {
@@ -139,22 +317,40 @@ class DocumentProcessor:
         chunk_overlap: int
     ) -> List[Dict[str, str]]:
         """Process DOCX file"""
+        print(f"   📝 Using DOCX processor")
+        
         if docx is None:
             print("⚠ python-docx not installed. Skipping DOCX processing.")
             return []
         
-        doc = docx.Document(file_path)
-        text = "\n".join([para.text for para in doc.paragraphs])
+        try:
+            doc = docx.Document(file_path)
+            text = "\n".join([para.text for para in doc.paragraphs])
+            
+            if not text or not text.strip():
+                print(f"   ⚠ No text found in DOCX")
+                return []
+            
+            # Clean and chunk
+            text = self._clean_text(text)
+            chunks = self._chunk_text(text, chunk_size, chunk_overlap)
+            
+            if not chunks:
+                return []
+            
+            print(f"   ✅ Created {len(chunks)} chunks")
+            
+            return [
+                {
+                    'question': f'What is in {file_path.name}?',
+                    'answer': chunk
+                }
+                for chunk in chunks
+            ]
         
-        chunks = self._chunk_text(text, chunk_size, chunk_overlap)
-        
-        return [
-            {
-                'question': f'What is in {file_path.name}?',
-                'answer': chunk
-            }
-            for chunk in chunks
-        ]
+        except Exception as e:
+            print(f"   ❌ Error processing DOCX: {e}")
+            return []
     
     def _process_json(
         self,
@@ -163,26 +359,38 @@ class DocumentProcessor:
         chunk_overlap: int
     ) -> List[Dict[str, str]]:
         """Process JSON file"""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        print(f"   📝 Using JSON processor")
         
-        results = []
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            results = []
+            
+            # Handle list of objects
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict):
+                        if 'question' in item and 'answer' in item:
+                            results.append(item)
+                        elif 'text' in item:
+                            chunks = self._chunk_text(item['text'], chunk_size, chunk_overlap)
+                            for chunk in chunks:
+                                results.append({
+                                    'question': f'From {file_path.name}:',
+                                    'answer': chunk
+                                })
+            
+            if not results:
+                print(f"   ⚠ No valid data found in JSON")
+                return []
+            
+            print(f"   ✅ Extracted {len(results)} items")
+            return results
         
-        # Handle list of objects
-        if isinstance(data, list):
-            for item in data:
-                if isinstance(item, dict):
-                    if 'question' in item and 'answer' in item:
-                        results.append(item)
-                    elif 'text' in item:
-                        chunks = self._chunk_text(item['text'], chunk_size, chunk_overlap)
-                        for chunk in chunks:
-                            results.append({
-                                'question': f'From {file_path.name}:',
-                                'answer': chunk
-                            })
-        
-        return results
+        except Exception as e:
+            print(f"   ❌ Error processing JSON: {e}")
+            return []
     
     def _process_csv(
         self,
@@ -193,18 +401,30 @@ class DocumentProcessor:
         """Process CSV file"""
         import csv
         
+        print(f"   📝 Using CSV processor")
+        
         results = []
         
-        with open(file_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if 'question' in row and 'answer' in row:
-                    results.append({
-                        'question': row['question'],
-                        'answer': row['answer']
-                    })
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if 'question' in row and 'answer' in row:
+                        results.append({
+                            'question': row['question'],
+                            'answer': row['answer']
+                        })
+            
+            if not results:
+                print(f"   ⚠ No valid rows found in CSV")
+                return []
+            
+            print(f"   ✅ Extracted {len(results)} rows")
+            return results
         
-        return results
+        except Exception as e:
+            print(f"   ❌ Error processing CSV: {e}")
+            return []
     
     def _process_markdown(
         self,
@@ -213,18 +433,36 @@ class DocumentProcessor:
         chunk_overlap: int
     ) -> List[Dict[str, str]]:
         """Process Markdown file"""
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
+        print(f"   📝 Using Markdown processor")
         
-        chunks = self._chunk_text(text, chunk_size, chunk_overlap)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            
+            if not text or not text.strip():
+                print(f"   ⚠ No text found in Markdown")
+                return []
+            
+            # Clean and chunk
+            text = self._clean_text(text)
+            chunks = self._chunk_text(text, chunk_size, chunk_overlap)
+            
+            if not chunks:
+                return []
+            
+            print(f"   ✅ Created {len(chunks)} chunks")
+            
+            return [
+                {
+                    'question': f'What is in {file_path.name}?',
+                    'answer': chunk
+                }
+                for chunk in chunks
+            ]
         
-        return [
-            {
-                'question': f'What is in {file_path.name}?',
-                'answer': chunk
-            }
-            for chunk in chunks
-        ]
+        except Exception as e:
+            print(f"   ❌ Error processing Markdown: {e}")
+            return []
     
     def _chunk_text(self, text: str, chunk_size: int, chunk_overlap: int) -> List[str]:
         """
