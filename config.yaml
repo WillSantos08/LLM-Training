@@ -1,0 +1,89 @@
+# ============================================================================
+# CEPHALON LUNA - Configuration
+# ============================================================================
+
+project:
+  name: "Cephalon Luna"
+  version: "1.0.0"
+  description: "Personal AI Assistant based on Transformer"
+
+# ============================================================================
+# PATHS
+# ============================================================================
+paths:
+  data_raw: "data/raw"
+  data_processed: "data/processed"
+  data_cache: "data/cache"
+  models_checkpoints: "models/checkpoints"
+  models_trained: "models/trained"
+
+# ============================================================================
+# MODEL ARCHITECTURE
+# ============================================================================
+model:
+  tokenizer_name: "gpt2"
+  vocab_size: 50257
+  embedding_dim: 256
+  num_layers: 3
+  num_heads: 4
+  max_sequence_length: 256
+  intermediate_dim: 1024
+  dropout_rate: 0.1
+
+# ============================================================================
+# TRAINING HYPERPARAMETERS
+# ============================================================================
+training:
+  device: "cpu"
+  seed: 42
+  learning_rate: 3e-4
+  batch_size: 4
+  num_epochs: 5
+  gradient_clip: 1.0
+  warmup_steps: 50
+  num_workers: 0
+
+  # Optimizer
+  optimizer_name: "adamw"
+  betas: [0.9, 0.95]
+  weight_decay: 0.1
+
+# ============================================================================
+# TEXT GENERATION
+# ============================================================================
+generation:
+  temperature: 0.8
+  max_tokens: 100
+  top_k: 50
+  top_p: 0.9
+
+# ============================================================================
+# DATA PROCESSING
+# ============================================================================
+data:
+  file_training: "cephalon_luna/data/processed/train_data.json"
+  file_validation: "cephalon_luna/data/processed/val_data.json"
+  validation_split: 0.1
+  shuffle: true
+  supported_formats:
+    - pdf
+    - docx
+    - txt
+    - json
+    - csv
+    - md
+
+# ============================================================================
+# DOCUMENT PROCESSING
+# ============================================================================
+documents:
+  chunk_size: 512
+  chunk_overlap: 50
+  encoding: "utf-8"
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+logging:
+  level: "INFO"
+  save_file: true
