@@ -17,7 +17,6 @@ from config.train_config import (
 
 @dataclass
 class LunaConfig:
-    """Configuração completa carregada do config.yaml."""
     paths:      PathsConfig
     data_aug:   bool
     val_ratio:  float
@@ -29,7 +28,6 @@ class LunaConfig:
     hardware:   HardwareConfig
 
     def resolve_device(self) -> torch.device:
-        """Resolve o device automaticamente."""
         d = self.hardware.device
         if d == "auto":
             if torch.cuda.is_available():
@@ -40,7 +38,6 @@ class LunaConfig:
         return torch.device(d)
 
     def ensure_dirs(self):
-        """Cria todos os diretórios necessários."""
         dirs = [
             self.paths.raw_data,
             self.paths.processed_data,
@@ -53,13 +50,32 @@ class LunaConfig:
             os.makedirs(d, exist_ok=True)
 
 
+def _find_config(filename: str = "config.yaml") -> str:
+    """
+    Procura o config.yaml subindo os diretórios
+    a partir do arquivo atual até encontrar.
+    """
+    # 1. Caminho passado diretamente
+    if os.path.exists(filename):
+        return filename
+
+    # 2. Subir diretórios até encontrar
+    current = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(5):
+        candidate = os.path.join(current, filename)
+        if os.path.exists(candidate):
+            return candidate
+        current = os.path.dirname(current)
+
+    raise FileNotFoundError(
+        f"config.yaml não encontrado.\n"
+        f"Certifique-se de que o arquivo existe na raiz do projeto."
+    )
+
+
 def load_config(path: str = "config.yaml") -> LunaConfig:
     """Carrega e valida o config.yaml."""
-    if not os.path.exists(path):
-        raise FileNotFoundError(
-            f"config.yaml não encontrado em '{path}'.\n"
-            f"Certifique-se de rodar os scripts a partir da raiz do projeto."
-        )
+    path = _find_config(path)
 
     with open(path, "r", encoding="utf-8") as f:
         raw = yaml.safe_load(f)
