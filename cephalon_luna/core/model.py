@@ -175,14 +175,53 @@ class LunaModel(nn.Module):
         return sum(p.numel() for p in self.parameters() if p.requires_grad)
 
     def save(self, path: str):
+        """Salva modelo e config juntos."""
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        torch.save({"cfg": self.cfg, "state": self.state_dict()}, path)
+
+        # Salvar config separado como dict puro
+        cfg_dict = {
+            "vocab_size":  self.cfg.vocab_size,
+            "context_len": self.cfg.context_len,
+            "d_model":     self.cfg.d_model,
+            "num_heads":   self.cfg.num_heads,
+            "num_layers":  self.cfg.num_layers,
+            "d_ff":        self.cfg.d_ff,
+            "dropout":     self.cfg.dropout,
+            "pad_id":      self.cfg.pad_id,
+        }
+
+        torch.save(
+            {
+                "cfg":   cfg_dict,
+                "state": self.state_dict(),
+            },
+            path,
+        )
         print(f"  💾 Modelo salvo : {path}")
 
     @classmethod
     def load(cls, path: str, device: str = "cpu") -> "LunaModel":
-        ckpt  = torch.load(path, map_location=device)
-        model = cls(ckpt["cfg"])
+        """Carrega modelo compatível com PyTorch 2.6+."""
+
+        # Adicionar ModelConfig como global seguro
+        torch.serialization.add_safe_globals([ModelConfig])
+
+        ckpt = torch.load(
+            path,
+            map_location = device,
+            weights_only = True,   # ✅ seguro no PyTorch 2.6+
+        )
+
+        # Reconstruir config a partir do dict puro
+        cfg_data = ckpt["cfg"]
+
+        # Suporte a checkpoint antigo (cfg era objeto) e novo (cfg é dict)
+        if isinstance(cfg_data, dict):
+            cfg = ModelConfig(**cfg_data)
+        else:
+            cfg = cfg_data
+
+        model = cls(cfg)
         model.load_state_dict(ckpt["state"])
         model = model.to(device)
         print(f"  ✅ Modelo carregado : {path}")
