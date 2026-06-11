@@ -334,12 +334,12 @@ Todos os ajustes são feitos no `config.yaml` na raiz do projeto.
 
 ```yaml
 paths:
-  raw_data:        "cephalon_luna/data/raw"
-  processed_data:  "cephalon_luna/data/processed"
-  tokenizer:       "cephalon_luna/data/tokenizer/tokenizer.json"
-  latest_model:    "cephalon_luna/models/latest/model.pt"
-  checkpoints:     "cephalon_luna/models/checkpoints"
-  logs:            "cephalon_luna/models/logs"
+  raw_data:        "data/raw"
+  processed_data:  "data/processed"
+  tokenizer:       "data/tokenizer/tokenizer.json"
+  latest_model:    "models/latest/model.pth"
+  checkpoints:     "models/checkpoints"
+  logs:            "models/logs"
 ```
 
 ### Modelo

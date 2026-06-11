@@ -9,69 +9,69 @@
 #  CAMINHOS
 # ───────────────────────────────────────────────────────
 paths:
-  raw_data:        "cephalon_luna/data/raw"
-  processed_data:  "cephalon_luna/data/processed"
-  tokenizer:       "cephalon_luna/data/tokenizer/tokenizer.json"
-  latest_model:    "cephalon_luna/models/latest/model.pt"
-  checkpoints:     "cephalon_luna/models/checkpoints"
-  logs:            "cephalon_luna/models/logs"
+  raw_data:        "data/raw"
+  processed_data:  "data/processed"
+  tokenizer:       "data/tokenizer/tokenizer.json"
+  latest_model:    "models/latest/model.pth"
+  checkpoints:     "models/checkpoints"
+  logs:            "models/logs"
 
 # ───────────────────────────────────────────────────────
 #  DADOS
 # ───────────────────────────────────────────────────────
 data:
-  augment:         true
+  augment:         false
   val_ratio:       0.1
 
 # ───────────────────────────────────────────────────────
 #  MODELO
 # ───────────────────────────────────────────────────────
 model:
-  vocab_size:      2000
-  context_len:     256
-  d_model:         256
-  num_heads:       8
-  num_layers:      6
-  d_ff:            1024
-  dropout:         0.1
+  vocab_size:      500
+  context_len:     64
+  d_model:         64
+  num_heads:       4
+  num_layers:      2
+  d_ff:            256
+  dropout:         0.05
 
 # ───────────────────────────────────────────────────────
 #  TREINAMENTO
 # ───────────────────────────────────────────────────────
 training:
-  epochs:          20
-  batch_size:      16
-  lr:              3e-4
-  grad_clip:       1.0
+  epochs:          5
+  batch_size:      1
+  lr:              1e-3
+  grad_clip:       0.5
   resume:          false
 
   scheduler:
-    enabled:       true
-    type:          "cosine"
-    warmup_epochs: 2
+    enabled:       false
+    type:          "none"
+    warmup_epochs: 0
 
 # ───────────────────────────────────────────────────────
 #  GERAÇÃO
 # ───────────────────────────────────────────────────────
 generation:
-  temperature:     0.7
-  top_k:           40
-  max_new_tokens:  120
+  temperature:     0.6
+  top_k:           10
+  max_new_tokens:  50
 
 # ───────────────────────────────────────────────────────
 #  CHECKPOINTS
 # ───────────────────────────────────────────────────────
 checkpoint:
-  save_every_n:    5
-  keep_last_n:     3
+  save_every_n:    2
+  keep_last_n:     1
 
 # ───────────────────────────────────────────────────────
 #  LOGGING
 # ───────────────────────────────────────────────────────
 logging:
-  log_every_pct:   20
+  log_every_pct:   50
   show_samples:    true
-  num_samples:     2
+  num_samples:     1
   sample_prompts:
     - "<usr>Quem é você?<sep>"
     - "<usr>O que é Python?<sep>"
@@ -82,5 +82,5 @@ logging:
 #  HARDWARE
 # ───────────────────────────────────────────────────────
 hardware:
-  device:          "auto"
+  device:          "cpu"
   seed:            42
