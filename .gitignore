@@ -1,61 +1,31 @@
-# ============================================================================
-# AMBIENTES VIRTUAIS PYTHON
-# ============================================================================
-.venv/
-venv/
-env/
-ENV/
-.Python
+# --- IGNORE ---
+cephalon_luna/models/checkpoints/*
+cephalon_luna/models/latest/*
+cephalon_luna/models/logs/*
+cephalon_luna/data/processed/*
+cephalon_luna/data/tokenizer/*
+cephalon_luna/data/raw/*
 
-# ============================================================================
-# PYTHON - ARQUIVOS COMPILADOS E CACHE
-# ============================================================================
+# Python cache files
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.pytest_cache/
-.coverage
-.mypy_cache/
+*.pyo
 *.egg-info/
 dist/
 build/
 
-# ============================================================================
-# DADOS - NÃO VERSIONAR
-# ============================================================================
-cephalon_luna/data/raw/*
-cephalon_luna/data/processed/*
-cephalon_luna/data/cache/*
+# Virtual environment
+.venv/
+venv/
+env/
 
-# ============================================================================
-# MODELOS TREINADOS - NÃO VERSIONAR
-# ============================================================================
-cephalon_luna/models/checkpoints/*
-cephalon_luna/models/trained/*
-*.pth
-*.pt
-*.ckpt
-
-# ============================================================================
-# SISTEMA OPERACIONAL
-# ============================================================================
-.DS_Store
-Thumbs.db
-.directory
-
-# ============================================================================
 # IDEs
-# ============================================================================
 .vscode/
 .idea/
 *.swp
-*.swo
+.DS_Store
+Thumbs.db
 
-# ============================================================================
-# SEGURANÇA
-# ============================================================================
-.env
-*.key
-*.pem
-credentials.json
+# Logs and temporary files
+cephalon_luna/models/logs/evaluation.png
+*.log

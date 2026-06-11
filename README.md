@@ -1,435 +1,541 @@
-# 🤖 Cephalon Luna
+# 🌙 Cephalon Luna
 
-> A lightweight, personal AI assistant based on Transformer architecture
-
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Maintained](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com)
-
-## 📋 Visão Geral
-
-**Cephalon Luna** é um assistente de IA pessoal baseado em arquitetura Transformer, otimizado para rodar eficientemente em CPU com recursos limitados. Treine seu próprio modelo com seus documentos e converse com ele!
-
-### ✨ Características Principais
-
-- **🧠 Transformer Customizável**: Implementação própria otimizada para CPU
-- **📚 Suporte a Múltiplos Formatos**: TXT, PDF, DOCX, JSON, CSV, MD
-- **⚡ Processamento Automático**: Converta arquivos brutos em dados de treino
-- **🎓 Fácil de Treinar**: Configure e treine em minutos
-- **💬 Chat Interativo**: Interface simples de linha de comando
-- **💾 Checkpoints**: Salve e retome treinamento a qualquer momento
-- **🎛️ Configurações Flexíveis**: Modelos pequeno, médio e grande
-- **🚀 CPU ou GPU**: Funciona em qualquer dispositivo
+> Assistente pessoal construída do zero com PyTorch.
+> Aprende a partir de arquivos Markdown e evolui a cada ciclo de treinamento.
 
 ---
 
-## 🚀 Início Rápido
+## Índice
 
-### Requisitos
+- [Sobre o Projeto](#sobre-o-projeto)
+- [Arquitetura](#arquitetura)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Requisitos](#requisitos)
+- [Instalação](#instalação)
+- [Como Usar](#como-usar)
+- [Como Ensinar a Luna](#como-ensinar-a-luna)
+- [Configuração](#configuração)
+- [Ciclo de Treinamento](#ciclo-de-treinamento)
+- [Avaliação](#avaliação)
+- [Dependências](#dependências)
+- [Licença](#licença)
 
-- **Python**: 3.12+
-- **RAM**: Mínimo 4GB (recomendado 8GB)
-- **Armazenamento**: 5GB
-- **CPU**: 2+ cores
-- **GPU** (opcional): Para treino mais rápido
+---
 
-### 1️⃣ Instalação
+## Sobre o Projeto
+
+Cephalon Luna é uma assistente pessoal baseada em um modelo de linguagem **construído do zero** utilizando PyTorch puro.
+
+Diferente de projetos que utilizam modelos pré-treinados como base, o Cephalon Luna implementa toda a arquitetura Transformer manualmente, desde o mecanismo de atenção até o tokenizer BPE, permitindo total controle sobre o aprendizado.
+
+O modelo aprende exclusivamente a partir de arquivos Markdown escritos pelo próprio usuário, seguindo um ciclo contínuo de:
+
+```
+Escreva → Treine → Teste → Avalie → Melhore → Repita
+```
+
+### Destaques
+
+- Transformer GPT-style implementado do zero com PyTorch
+- Tokenizer próprio baseado em vocabulário de subpalavras
+- Aprende com arquivos Markdown simples
+- Ciclo contínuo de treinamento com checkpoints automáticos
+- Avaliação visual com gráficos gerados pelo matplotlib
+- Configuração centralizada via `config.yaml`
+- Suporte a CPU, GPU (CUDA) e Apple Silicon (MPS)
+
+---
+
+## Arquitetura
+
+O Cephalon Luna é um modelo de linguagem causal (GPT-style) composto pelos seguintes componentes:
+
+### Modelo
+
+```
+Token IDs
+    ↓
+Token Embedding + Positional Embedding
+    ↓
+Dropout
+    ↓
+[ LayerNorm → CausalAttention → Residual ] × N camadas
+[ LayerNorm → FeedForward     → Residual ]
+    ↓
+LayerNorm Final
+    ↓
+LM Head (Linear → vocab_size)
+    ↓
+Logits → próximo token
+```
+
+### Componentes Internos
+
+| Componente | Descrição |
+|---|---|
+| `CausalAttention` | Multi-head self-attention com máscara causal via `scaled_dot_product_attention` |
+| `FeedForward` | MLP com ativação GELU e dropout |
+| `TransformerBlock` | Bloco completo com pre-norm e conexões residuais |
+| `LunaModel` | Modelo completo com weight tying entre embedding e lm_head |
+
+### Tokenizer
+
+O tokenizer é baseado em vocabulário de subpalavras com tokens especiais dedicados ao formato de conversa:
+
+| Token | ID | Uso |
+|---|---|---|
+| `<pad>` | 0 | Padding de sequências |
+| `<unk>` | 1 | Token desconhecido |
+| `<bos>` | 2 | Início de sequência |
+| `<eos>` | 3 | Fim de sequência |
+| `<usr>` | 4 | Início da fala do usuário |
+| `<sep>` | 5 | Separador pergunta / resposta |
+
+### Formato de Treinamento
+
+Cada par do Markdown é convertido para o seguinte formato antes de ser tokenizado:
+
+```
+<usr>pergunta<sep>resposta<eos>
+```
+
+---
+
+## Estrutura do Projeto
+
+```
+.
+├── .gitignore
+├── README.md
+├── config.yaml                        ← configuração central
+├── requirements.txt                   ← dependências
+│
+└── cephalon_luna/
+    │
+    ├── train.py                       ← executa o treinamento
+    ├── test.py                        ← interface de chat
+    ├── evaluate.py                    ← gráficos e métricas
+    │
+    ├── config/                        ← configurações tipadas
+    │   ├── __init__.py
+    │   ├── settings.py                ← lê e valida o config.yaml
+    │   ├── model_config.py            ← dataclass da arquitetura
+    │   └── train_config.py            ← dataclasses de treino
+    │
+    ├── core/                          ← núcleo do modelo
+    │   ├── __init__.py
+    │   ├── tokenizer.py               ← tokenizer de subpalavras
+    │   ├── model.py                   ← Transformer completo
+    │   ├── dataset.py                 ← Dataset e DataLoaders
+    │   └── trainer.py                 ← loop treino → avaliação → checkpoint
+    │
+    ├── parser/                        ← leitura dos markdowns
+    │   ├── __init__.py
+    │   └── markdown_parser.py         ← extrai pares pergunta/resposta
+    │
+    ├── interface/                     ← interação com o usuário
+    │   ├── __init__.py
+    │   └── repl.py                    ← chat interativo no terminal
+    │
+    ├── data/
+    │   ├── raw/                       ← seus arquivos .md (você escreve aqui)
+    │   ├── processed/                 ← corpus.txt (gerado automaticamente)
+    │   └── tokenizer/                 ← tokenizer.json (gerado automaticamente)
+    │
+    └── models/
+        ├── checkpoints/               ← epoch_005.pt, epoch_010.pt ...
+        ├── latest/                    ← model.pt (melhor modelo salvo)
+        └── logs/                      ← history.json, evaluation.png
+```
+
+### O que é gerado automaticamente
+
+```
+data/processed/corpus.txt             ← corpus extraído dos .md
+data/tokenizer/tokenizer.json         ← vocabulário treinado
+models/latest/model.pt                ← melhor modelo salvo
+models/checkpoints/epoch_NNN.pt       ← checkpoints periódicos
+models/logs/history.json              ← histórico de métricas
+models/logs/evaluation.png            ← gráficos (com --save)
+```
+
+### O que você escreve
+
+```
+config.yaml                           ← ajuste do modelo
+cephalon_luna/data/raw/*.md           ← conhecimento da Luna
+```
+
+---
+
+## Requisitos
+
+- Python 3.10 ou superior
+- pip
+
+### Hardware Suportado
+
+| Hardware | Suporte |
+|---|---|
+| CPU | ✅ Qualquer máquina |
+| GPU NVIDIA (CUDA) | ✅ Recomendado para modelos maiores |
+| Apple Silicon (MPS) | ✅ Mac M1, M2, M3, M4 |
+
+---
+
+## Instalação
+
+### 1. Clonar o repositório
 
 ```bash
-# Clone ou baixe o projeto
-cd cephalon_luna
+git clone https://github.com/seu-usuario/cephalon-luna.git
+cd cephalon-luna
+```
 
-# Crie um ambiente virtual
+### 2. Criar o ambiente virtual
+
+```bash
 python -m venv .venv
+```
 
-# Ative o ambiente
-source .venv/bin/activate  # Linux/Mac
-# ou
-.venv\Scripts\activate     # Windows
+### 3. Ativar o ambiente
 
-# Instale dependências
+```bash
+# Linux / Mac
+source .venv/bin/activate
+
+# Windows
+.venv\Scripts\activate
+```
+
+### 4. Instalar dependências
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2️⃣ Prepare seus Dados
-
-Opção A: Use dados de exemplo
+### 5. Verificar instalação
 
 ```bash
-cd cephalon_luna
-python main.py
-# Selecione opção 4 para criar dados de exemplo
+python -c "
+import torch
+import yaml
+import matplotlib
+
+print('torch      :', torch.__version__)
+print('yaml       :', yaml.__version__)
+print('matplotlib :', matplotlib.__version__)
+print('CUDA       :', torch.cuda.is_available())
+print('MPS        :', torch.backends.mps.is_available())
+"
 ```
 
-Opção B: Use seus próprios arquivos
+---
+
+## Como Usar
+
+### Treinar o modelo
 
 ```bash
-# Coloque seus arquivos em:
-cephalon_luna/data/raw/seu_arquivo.txt
+# Treinar do zero
+python cephalon_luna/train.py
+
+# Continuar de onde parou
+python cephalon_luna/train.py --resume
 ```
 
-### 3️⃣ Treine o Modelo
+### Testar e conversar
 
 ```bash
-cd cephalon_luna
-
-# Treine com arquivo bruto
-python train.py --raw data/raw/seu_arquivo.txt --epochs 5
-
-# Ou com dados já processados
-python train.py --data data/processed/seu_dado.json --epochs 5
+python cephalon_luna/test.py
 ```
 
-### 4️⃣ Converse com seu Assistente
+### Avaliar a evolução
 
 ```bash
-cd cephalon_luna
+# Exibir gráficos na tela
+python cephalon_luna/evaluate.py
 
-# Chat interativo
-python test.py --model models/trained/final_model.pth
-
-# Ou teste com um prompt específico
-python test.py --model models/trained/final_model.pth --prompt "O que você sabe?"
+# Salvar gráficos em PNG
+python cephalon_luna/evaluate.py --save
 ```
 
-## 📁 Estrutura do Projeto
+### Comandos disponíveis no chat
 
-```text
-cephalon_luna/
-├── config/                      # Configurações e lógica principal
-│   ├── settings/               # Classes de configuração
-│   │   ├── constants.py       # Constantes padrão
-│   │   ├── base.py            # Configuração base
-│   │   ├── small.py           # Config otimizada para CPU
-│   │   └── large.py           # Config para GPU
-│   ├── transformer/            # Arquitetura do modelo
-│   │   ├── attention.py       # Multi-head attention
-│   │   ├── feed_forward.py    # Feed-forward network
-│   │   └── model.py           # Modelo principal
-│   └── data/                   # Processamento de dados
-│       ├── dataset.py         # Dataset class
-│       ├── loader.py          # DataLoader creator
-│       ├── processor.py       # Document processor
-│       └── trainer.py         # Training logic
-├── data/
-│   ├── raw/                    # Documentos originais (seus arquivos)
-│   ├── processed/              # Dados processados para treino
-│   └── cache/                  # Cache temporário
-├── models/
-│   ├── checkpoints/            # Checkpoints durante treino
-│   └── trained/                # Modelos finais treinados
-├── train.py                    # Script de treinamento
-├── test.py                     # Script de teste/chat
-├── process_text.py             # Processador de arquivos
-└── main.py                     # Menu interativo
+| Comando | Descrição |
+|---|---|
+| `sair` | Encerra a sessão |
+| `/temp 0.7` | Ajusta a temperature em tempo real |
+| `/topk 40` | Ajusta o top-k em tempo real |
+
+---
+
+## Como Ensinar a Luna
+
+Todo o conhecimento da Luna vem dos arquivos `.md` em `cephalon_luna/data/raw/`.
+
+### Formato do arquivo
+
+```markdown
+---
+categoria: nome_da_categoria
+prioridade: alta
+---
+
+# Título do Arquivo
+
+## Seção
+
+Pergunta: sua pergunta aqui
+Resposta: a resposta que você quer que Luna aprenda
 ```
 
-## 💻 Uso Detalhado
+### Regras
+
+- Toda `Resposta:` precisa vir logo após uma `Pergunta:`
+- Pode ter quantos pares quiser por arquivo
+- Pode ter quantos arquivos `.md` quiser
+- O frontmatter `---` é opcional mas recomendado para organização
+
+### Exemplo
+
+```markdown
+---
+categoria: programacao
+prioridade: alta
+---
+
+# Python
+
+Pergunta: O que é Python?
+Resposta: Python é uma linguagem de programação de alto nível, Operador. É conhecida pela sintaxe limpa e é amplamente usada em inteligência artificial, automação e desenvolvimento web.
+
+Pergunta: O que é uma lista em Python?
+Resposta: Uma lista em Python é uma estrutura de dados ordenada e mutável, Operador. Você pode criar uma com colchetes, por exemplo: minha_lista = [1, 2, 3].
+```
+
+### Após adicionar ou editar arquivos
+
+```bash
+python cephalon_luna/train.py --resume
+```
+
+### Data Augmentation
+
+O sistema gera automaticamente variações dos pares de treino quando `data.augment: true` no `config.yaml`. Isso aumenta a diversidade dos dados sem que você precise escrever mais exemplos.
+
+---
+
+## Configuração
+
+Todos os ajustes são feitos no `config.yaml` na raiz do projeto.
+
+### Caminhos
+
+```yaml
+paths:
+  raw_data:        "cephalon_luna/data/raw"
+  processed_data:  "cephalon_luna/data/processed"
+  tokenizer:       "cephalon_luna/data/tokenizer/tokenizer.json"
+  latest_model:    "cephalon_luna/models/latest/model.pt"
+  checkpoints:     "cephalon_luna/models/checkpoints"
+  logs:            "cephalon_luna/models/logs"
+```
+
+### Modelo
+
+| Parâmetro | Descrição | Padrão |
+|---|---|---|
+| `vocab_size` | Tamanho do vocabulário | `2000` |
+| `context_len` | Janela de contexto em tokens | `256` |
+| `d_model` | Dimensão interna do modelo | `256` |
+| `num_heads` | Cabeças de atenção | `8` |
+| `num_layers` | Blocos Transformer | `6` |
+| `d_ff` | Dimensão da camada feed-forward | `1024` |
+| `dropout` | Taxa de regularização | `0.1` |
+
+### Guia de tamanho do modelo
+
+| Situação | d_model | num_heads | num_layers | d_ff |
+|---|---|---|---|---|
+| Poucos dados (< 500 pares) | `128` | `4` | `4` | `512` |
+| Médio (500 a 2000 pares) | `256` | `8` | `6` | `1024` |
+| Muitos dados (> 2000 pares) | `512` | `8` | `8` | `2048` |
 
 ### Treinamento
 
-Com arquivo bruto (recomendado)
+| Parâmetro | Descrição | Padrão |
+|---|---|---|
+| `epochs` | Voltas completas sobre os dados | `20` |
+| `batch_size` | Sequências por passo | `16` |
+| `lr` | Learning rate | `3e-4` |
+| `grad_clip` | Gradient clipping | `1.0` |
+| `resume` | Continuar do último checkpoint | `false` |
+
+### Scheduler de Learning Rate
+
+| Tipo | Comportamento |
+|---|---|
+| `cosine` | Decaimento suave em curva cossenoide (recomendado) |
+| `linear` | Decaimento linear simples |
+| `none` | Learning rate fixo durante todo o treino |
+
+### Geração
+
+| Parâmetro | Descrição | Padrão |
+|---|---|---|
+| `temperature` | Criatividade da resposta | `0.7` |
+| `top_k` | Tokens candidatos por passo | `40` |
+| `max_new_tokens` | Tamanho máximo da resposta | `120` |
+
+### Guia de temperature
+
+| Faixa | Comportamento |
+|---|---|
+| `0.1 → 0.4` | Respostas certeiras e repetitivas |
+| `0.5 → 0.7` | Equilíbrio entre foco e variedade (recomendado) |
+| `0.8 → 1.2` | Respostas mais criativas e variadas |
+| `> 1.2` | Respostas caóticas |
+
+### Checkpoints
+
+| Parâmetro | Descrição | Padrão |
+|---|---|---|
+| `save_every_n` | Salvar checkpoint a cada N epochs | `5` |
+| `keep_last_n` | Manter apenas os N checkpoints mais recentes | `3` |
+
+### Hardware
+
+| Parâmetro | Opções | Padrão |
+|---|---|---|
+| `device` | `auto`, `cpu`, `cuda`, `mps` | `auto` |
+| `seed` | Semente para reprodutibilidade | `42` |
+
+---
+
+## Ciclo de Treinamento
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│   1. Escreva pares no .md                               │
+│              ↓                                          │
+│   2. python cephalon_luna/train.py                      │
+│              ↓                                          │
+│      ┌─ TREINO ──────────────────────┐                  │
+│      │  forward → backward → step    │                  │
+│      └───────────────────────────────┘                  │
+│              ↓                                          │
+│      ┌─ AVALIAÇÃO ───────────────────┐                  │
+│      │  val loss + perplexidade      │                  │
+│      └───────────────────────────────┘                  │
+│              ↓                                          │
+│      ┌─ CHECKPOINT ──────────────────┐                  │
+│      │  salva se melhorou            │                  │
+│      └───────────────────────────────┘                  │
+│              ↓                                          │
+│      ┌─ AMOSTRAS ────────────────────┐                  │
+│      │  gera respostas ao vivo       │                  │
+│      └───────────────────────────────┘                  │
+│              ↓                                          │
+│   3. python cephalon_luna/test.py                       │
+│              ↓                                          │
+│   4. Identificou respostas ruins?                       │
+│              ↓                                          │
+│   5. Corrija ou adicione exemplos no .md                │
+│              ↓                                          │
+│      Volte ao passo 2                                   │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Interpretando o output do treino
+
+```
+  ┌─ EPOCH 1/20 ─ TREINO ─────────────
+    Epoch 1 │  20.0% │ loss=4.1200 │ 2.1s
+    Epoch 1 │ 100.0% │ loss=3.0100 │ 10.6s
+  │  Train Loss : 3.4060 │ PPL : 30.17
+  ├─ EPOCH 1/20 ─ AVALIAÇÃO ──────────
+  │  Val Loss   : 3.2100 │ PPL : 24.78 ⭐ Melhor!
+  │  💾 Melhor modelo → models/latest/model.pt
+  ├─ EPOCH 1/20 ─ AMOSTRAS ─────────
+  │  💬 Quem é você?
+  │  🤖 Sou Cephalon Luna...
+```
+
+| Sinal | Significado |
+|---|---|
+| `loss` caindo | Modelo aprendendo ✅ |
+| `PPL` caindo | Modelo melhorando ✅ |
+| `⭐ Melhor!` | Novo melhor modelo salvo ✅ |
+| `loss` estável por muitas epochs | Aumentar `lr` ⚠️ |
+| `val loss` subindo enquanto `train loss` cai | Overfitting, reduza `epochs` ou aumente `dropout` ❌ |
+
+---
+
+## Avaliação
+
+O `evaluate.py` gera os seguintes gráficos a partir do `history.json`:
+
+| Gráfico | Descrição |
+|---|---|
+| Loss por Epoch | Train loss vs Val loss ao longo do treino |
+| Perplexidade | Evolução da perplexidade no conjunto de validação |
+| Δ Val Loss | Variação da val loss entre epochs (verde = melhorou) |
+| Learning Rate | Curva do scheduler ao longo do treino |
+| Tabela Resumo | Métricas finais consolidadas |
 
 ```bash
-cd cephalon_luna
+# Visualizar na tela
+python cephalon_luna/evaluate.py
 
-# Processa arquivo e treina automaticamente
-python train.py --raw data/raw/documento.txt --config small --epochs 5
+# Salvar em PNG em models/logs/evaluation.png
+python cephalon_luna/evaluate.py --save
 ```
 
-Com dados já processados
+---
+
+## Dependências
+
+| Lib | Versão | Uso |
+|---|---|---|
+| `torch` | latest | Motor de deep learning e Transformer |
+| `numpy` | latest | Operações numéricas |
+| `pyyaml` | latest | Leitura e validação do config.yaml |
+| `matplotlib` | latest | Geração de gráficos de avaliação |
 
 ```bash
-python train.py --data data/processed/dados.json --config small --epochs 5
+pip install -r requirements.txt
 ```
 
-Com parâmetros customizados
+---
+
+## Instalação com GPU
+
+### CUDA 11.8
 
 ```bash
-python train.py \
-  --raw data/raw/documento.txt \
-  --config small \
-  --epochs 10 \
-  --batch-size 8
+pip install torch --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
 ```
 
-### Teste e Chat
-
-Modo interativo
+### CUDA 12.1
 
 ```bash
-python test.py --model models/trained/final_model.pth
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+pip install -r requirements.txt
 ```
 
-```text
-You: O que você aprendeu?
-Assistant: [resposta do modelo]
-
-You: Como funciona IA?
-Assistant: [resposta do modelo]
-```
-
-Teste com prompt único
+### Apple Silicon
 
 ```bash
-python test.py \
-  --model models/trained/final_model.pth \
-  --prompt "Explique machine learning"
+pip install -r requirements.txt
+# suporte MPS já incluso no pacote padrão do PyTorch
 ```
 
-Com temperatura customizada
+---
 
-```bash
-python test.py \
-  --model models/trained/final_model.pth \
-  --temperature 0.5 \
-  --max-tokens 100
-```
+## Licença
 
-Menu Interativo
-
-```bash
-python main.py
-```
-
-Opções:
-
-- Treinar modelo
-- Chat com modelo
-- Processar documentos
-- Criar dados de exemplo
-- Sair
-
-## 📊 Formatos de Dados Suportados
-
-JSON (Recomendado)
-
-```json
-[
-  {
-    "question": "Sua pergunta?",
-    "answer": "A resposta correspondente..."
-  },
-  {
-    "question": "Outra pergunta?",
-    "answer": "Outra resposta..."
-  }
-]
-```
-
-Arquivos Brutos
-
-- TXT: Arquivos de texto simples
-- PDF: Documentos PDF
-- DOCX: Arquivos Word
-- CSV: Dados estruturados
-- MD: Arquivos Markdown
-
-Todos são processados automaticamente para formato JSON!
-
-## 🎛️ Configurações
-
-**Small (Padrão - CPU)**
-
-- Embedding Dimension: 256
-- Layers: 3
-- Attention Heads: 4
-- Batch Size: 4
-- Tempo por época: ~10 min (10 exemplos)
-- Memória: ~500MB
-
-**Large (GPU)**
-
-- Embedding Dimension: 768
-- Layers: 12
-- Attention Heads: 12
-- Batch Size: 32
-- Tempo por época: ~2 min (1000 exemplos)
-- Memória: ~2GB
-
-### Customizar
-
-Edite `config.yaml` na raiz do projeto:
-
-```yaml
-model:
-  embedding_dim: 512
-  num_layers: 6
-  num_heads: 8
-
-training:
-  learning_rate: 3e-4
-  batch_size: 8
-  num_epochs: 10
-```
-
-## 🔧 Troubleshooting
-
-**Out of Memory**
-
-```bash
-# Reduzir tamanho do batch
-python train.py --batch-size 2
-
-# Ou usar modelo menor
-python train.py --config small
-```
-
-**Arquivo não encontrado**
-
-```bash
-# Certifique-se de que está no diretório correto
-cd cephalon_luna
-
-# E que o arquivo existe
-ls data/raw/seu_arquivo.txt
-```
-
-**Modelo não carrega**
-
-```bash
-# Verifique o caminho
-python test.py --model models/trained/final_model.pth
-
-# Use a mesma configuração usada no treino
-python test.py --model models/trained/final_model.pth --config small
-```
-
-**Treinamento muito lento**
-
-```bash
-# Use GPU se disponível - edite config.yaml:
-device: "cuda"
-
-# Ou reduza o tamanho do modelo
-python train.py --config small
-```
-
-## 📈 Dicas para Melhor Performance
-
-### Dados de Qualidade
-
-- ✅ Use 100+ exemplos de treino
-- ✅ Mantenha consistência nas respostas
-- ✅ Diversifique as perguntas
-- ✅ Evite dados duplicados
-
-### Treino Eficiente
-
-- ✅ Comece com --config small
-- ✅ Treine por 5-10 épocas
-- ✅ Use --batch-size 4 para CPU
-- ✅ Monitore o progresso
-
-### Melhorar Respostas
-
-```bash
-# Aumentar épocas
-python train.py --raw dados.txt --epochs 20
-
-# Usar modelo maior (requer GPU)
-python train.py --raw dados.txt --config large
-
-# Ajustar temperatura (mais criativo)
-python test.py --model final_model.pth --temperature 0.8
-```
-
-## 🏗️ Arquitetura Técnica
-
-Transformer Decoder-Only
-
-```text
-Input Tokens
-    ↓
-Embedding (vocab → embedding_dim)
-    ↓
-[Transformer Block × num_layers]
-    ├─ Multi-Head Attention
-    ├─ Layer Norm + Residual
-    ├─ Feed-Forward
-    └─ Layer Norm + Residual
-    ↓
-Output Projection (embedding_dim → vocab)
-    ↓
-Logits → Softmax → Próximo Token
-```
-
-Componentes Principais
-
-- Token Embedding: Converte índices em vetores densos
-- Positional Embedding: Adiciona informação de posição
-- Multi-Head Attention: Mecanismo de atenção múltipla
-- Feed-Forward: Rede posição-wise
-- Layer Normalization: Estabilização
-- Residual Connections: Fluxo de gradientes
-
-Para mais detalhes, veja docs/ARCHITECTURE.md
-
-## 🔗 Uso como Biblioteca Python
-
-```python
-from cephalon_luna import ConfigSmall, TransformerModel, Trainer, create_dataloader
-import torch
-
-# Setup
-config = ConfigSmall()
-model = TransformerModel(config)
-
-# Load data
-dataloader, tokenizer = create_dataloader(
-    'data/processed/dados.json',
-    tokenizer_name=config.tokenizer_name,
-    batch_size=config.batch_size,
-    max_length=config.max_sequence_length
-)
-
-# Train
-trainer = Trainer(model, config)
-trainer.train(dataloader, num_epochs=5)
-
-# Save
-trainer.save_model('final_model.pth')
-
-# Generate
-prompt_ids = tokenizer.encode("Olá", return_tensors='pt').to(config.device)
-generated = model.generate(prompt_ids, max_new_tokens=50)
-response = tokenizer.decode(generated[0], skip_special_tokens=True)
-print(response)
-```
-
-Para mais exemplos, veja docs/API.md
-
-## 📚 Documentação
-
-- QUICK_START.md - Guia de início rápido
-- ARCHITECTURE.md - Detalhes técnicos
-- API.md - Referência de API Python
-
-## 🤝 Contribuindo
-
-Sugestões e melhorias são bem-vindas!
-
-- Fork o projeto
-- Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-- Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-- Push para a branch (`git push origin feature/AmazingFeature`)
-- Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto está sob a licença MIT - veja o arquivo LICENSE para detalhes.
-
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software...
-
-## 🙏 Agradecimentos
-
-- Baseado na arquitetura Transformer de "Attention is All You Need"
-- Utiliza PyTorch para computação
-- Tokenizador via HuggingFace Transformers
-- Inspirado em projetos open-source de LLM
+MIT

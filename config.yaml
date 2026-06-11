@@ -1,89 +1,86 @@
-# ============================================================================
-# CEPHALON LUNA - Configuration
-# ============================================================================
+# config.yaml
+# ═══════════════════════════════════════════════════════
+#  Cephalon Luna — Configuração Central
+#  Edite aqui para ajustar o comportamento do modelo.
+#  Não é necessário mexer no código Python.
+# ═══════════════════════════════════════════════════════
 
-project:
-  name: "Cephalon Luna"
-  version: "1.0.0"
-  description: "Personal AI Assistant based on Transformer"
-
-# ============================================================================
-# PATHS
-# ============================================================================
+# ───────────────────────────────────────────────────────
+#  CAMINHOS
+# ───────────────────────────────────────────────────────
 paths:
-  data_raw: "data/raw"
-  data_processed: "data/processed"
-  data_cache: "data/cache"
-  models_checkpoints: "models/checkpoints"
-  models_trained: "models/trained"
+  raw_data:        "cephalon_luna/data/raw"
+  processed_data:  "cephalon_luna/data/processed"
+  tokenizer:       "cephalon_luna/data/tokenizer/tokenizer.json"
+  latest_model:    "cephalon_luna/models/latest/model.pt"
+  checkpoints:     "cephalon_luna/models/checkpoints"
+  logs:            "cephalon_luna/models/logs"
 
-# ============================================================================
-# MODEL ARCHITECTURE
-# ============================================================================
-model:
-  tokenizer_name: "gpt2"
-  vocab_size: 50257
-  embedding_dim: 256
-  num_layers: 3
-  num_heads: 4
-  max_sequence_length: 256
-  intermediate_dim: 1024
-  dropout_rate: 0.1
-
-# ============================================================================
-# TRAINING HYPERPARAMETERS
-# ============================================================================
-training:
-  device: "cpu"
-  seed: 42
-  learning_rate: 3e-4
-  batch_size: 4
-  num_epochs: 5
-  gradient_clip: 1.0
-  warmup_steps: 50
-  num_workers: 0
-
-  # Optimizer
-  optimizer_name: "adamw"
-  betas: [0.9, 0.95]
-  weight_decay: 0.1
-
-# ============================================================================
-# TEXT GENERATION
-# ============================================================================
-generation:
-  temperature: 0.8
-  max_tokens: 100
-  top_k: 50
-  top_p: 0.9
-
-# ============================================================================
-# DATA PROCESSING
-# ============================================================================
+# ───────────────────────────────────────────────────────
+#  DADOS
+# ───────────────────────────────────────────────────────
 data:
-  file_training: "cephalon_luna/data/processed/train_data.json"
-  file_validation: "cephalon_luna/data/processed/val_data.json"
-  validation_split: 0.1
-  shuffle: true
-  supported_formats:
-    - pdf
-    - docx
-    - txt
-    - json
-    - csv
-    - md
+  augment:         true
+  val_ratio:       0.1
 
-# ============================================================================
-# DOCUMENT PROCESSING
-# ============================================================================
-documents:
-  chunk_size: 512
-  chunk_overlap: 50
-  encoding: "utf-8"
+# ───────────────────────────────────────────────────────
+#  MODELO
+# ───────────────────────────────────────────────────────
+model:
+  vocab_size:      2000
+  context_len:     256
+  d_model:         256
+  num_heads:       8
+  num_layers:      6
+  d_ff:            1024
+  dropout:         0.1
 
-# ============================================================================
-# LOGGING
-# ============================================================================
+# ───────────────────────────────────────────────────────
+#  TREINAMENTO
+# ───────────────────────────────────────────────────────
+training:
+  epochs:          20
+  batch_size:      16
+  lr:              3e-4
+  grad_clip:       1.0
+  resume:          false
+
+  scheduler:
+    enabled:       true
+    type:          "cosine"
+    warmup_epochs: 2
+
+# ───────────────────────────────────────────────────────
+#  GERAÇÃO
+# ───────────────────────────────────────────────────────
+generation:
+  temperature:     0.7
+  top_k:           40
+  max_new_tokens:  120
+
+# ───────────────────────────────────────────────────────
+#  CHECKPOINTS
+# ───────────────────────────────────────────────────────
+checkpoint:
+  save_every_n:    5
+  keep_last_n:     3
+
+# ───────────────────────────────────────────────────────
+#  LOGGING
+# ───────────────────────────────────────────────────────
 logging:
-  level: "INFO"
-  save_file: true
+  log_every_pct:   20
+  show_samples:    true
+  num_samples:     2
+  sample_prompts:
+    - "<usr>Quem é você?<sep>"
+    - "<usr>O que é Python?<sep>"
+    - "<usr>Olá!<sep>"
+    - "<usr>Você tem sentimentos?<sep>"
+
+# ───────────────────────────────────────────────────────
+#  HARDWARE
+# ───────────────────────────────────────────────────────
+hardware:
+  device:          "auto"
+  seed:            42

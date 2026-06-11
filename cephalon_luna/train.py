@@ -1,161 +1,127 @@
-"""
-Training script for Cephalon Luna
-"""
-
-import argparse
+import os
+import sys
 import torch
-from pathlib import Path
 
-from config import ConfigSmall, ConfigLarge
-from config.transformer import TransformerModel
-from config.data import create_dataloader, Trainer
+sys.path.insert(0, os.path.dirname(__file__))
+
+from config.settings        import load_config
+from parser.markdown_parser import MarkdownParser
+from core.tokenizer         import LunaTokenizer
+from core.model             import LunaModel
+from core.dataset           import build_loaders
+from core.trainer           import Trainer
 
 
 def main():
-    """Main training function"""
-    
-    parser = argparse.ArgumentParser(description='Train Cephalon Luna')
-    parser.add_argument(
-        '--config',
-        type=str,
-        choices=['small', 'large'],
-        default='small',
-        help='Configuration size (small for CPU, large for GPU)'
-    )
-    parser.add_argument(
-        '--data',
-        type=str,
-        default='data/processed/sample_data.json',
-        help='Path to training data JSON file'
-    )
-    parser.add_argument(
-        '--raw',
-        type=str,
-        default=None,
-        help='Path to raw text file (will be processed automatically)'
-    )
-    parser.add_argument(
-        '--epochs',
-        type=int,
-        default=None,
-        help='Number of epochs (uses config default if not set)'
-    )
-    parser.add_argument(
-        '--batch-size',
-        type=int,
-        default=None,
-        help='Batch size (uses config default if not set)'
-    )
-    
-    args = parser.parse_args()
-    
-    # =========================================================================
-    # LOAD CONFIGURATION
-    # =========================================================================
-    print("\n" + "="*70)
-    print("CEPHALON LUNA - TRAINING SCRIPT")
-    print("="*70 + "\n")
-    
-    print(f"📋 Loading {args.config} configuration...")
-    if args.config == 'small':
-        config = ConfigSmall()
+    print("""
+╔══════════════════════════════════════════╗
+     🌙  Cephalon Luna - Treinamento       
+            Treino → Teste → Repita         
+╚══════════════════════════════════════════╝
+    """)
+
+    cfg = load_config("config.yaml")
+    cfg.ensure_dirs()
+
+    if "--resume" in sys.argv:
+        cfg.training.resume = True
+
+    torch.manual_seed(cfg.hardware.seed)
+    device = cfg.resolve_device()
+
+    print(f"  🖥️  Device : {device}")
+    print(f"  🌱 Seed   : {cfg.hardware.seed}\n")
+
+    # ── 1. Markdowns ──────────────────────────────────
+    print("── 1. Lendo Markdowns ───────────────────────")
+    parser = MarkdownParser(cfg.paths.raw_data)
+    kb     = parser.parse_all()
+
+    if len(kb) == 0:
+        print(f"  ❌ Nenhum par encontrado em {cfg.paths.raw_data}")
+        sys.exit(1)
+
+    if cfg.data_aug:
+        kb = parser.augment(kb)
+        print(f"  🔀 Após augmentation : {len(kb)} pares")
+
+    corpus      = kb.to_corpus()
+    corpus_path = os.path.join(cfg.paths.processed_data, "corpus.txt")
+
+    with open(corpus_path, "w", encoding="utf-8") as f:
+        f.write(corpus)
+
+    print(f"  💾 Corpus salvo : {corpus_path}")
+    print(f"  📝 Tamanho      : {len(corpus):,} chars\n")
+
+    # ── 2. Tokenizer ──────────────────────────────────
+    print("── 2. Tokenizer ─────────────────────────────")
+    tok_path = cfg.paths.tokenizer
+
+    if os.path.exists(tok_path) and cfg.training.resume:
+        tokenizer = LunaTokenizer.load(tok_path)
     else:
-        config = ConfigLarge()
-    
-    print(config)
-    
-    # =========================================================================
-    # PROCESS RAW FILE IF PROVIDED
-    # =========================================================================
-    if args.raw:
-        print(f"📄 Processing raw file: {args.raw}")
-        
-        from process_text import TextProcessor
-        
-        processor = TextProcessor()
-        filename = Path(args.raw).stem
-        output_file = f"data/processed/{filename}.json"
-        
-        processor.process_to_training_format(args.raw, output_file)
-        
-        # Use processed data for training
-        args.data = output_file
-        print()
-    
-    # Override config if arguments provided
-    if args.epochs is not None:
-        config.num_epochs = args.epochs
-    if args.batch_size is not None:
-        config.batch_size = args.batch_size
-    
-    # =========================================================================
-    # CHECK DATA FILE
-    # =========================================================================
-    data_path = Path(args.data)
-    if not data_path.exists():
-        print(f"❌ Data file not found: {args.data}")
-        print(f"   Expected location: {data_path.absolute()}")
-        return
-    
-    print(f"✅ Data file found: {args.data}\n")
-    
-    # =========================================================================
-    # CREATE MODEL
-    # =========================================================================
-    print("🧠 Creating model...")
-    model = TransformerModel(config)
+        tokenizer = LunaTokenizer()
+        tokenizer.train(corpus, max_vocab=cfg.model.vocab_size)
+        tokenizer.save(tok_path)
     print()
-    
-    # =========================================================================
-    # CREATE DATALOADER
-    # =========================================================================
-    print("📂 Creating dataloader...")
-    dataloader, tokenizer = create_dataloader(
-        file_path=args.data,
-        tokenizer_name=config.tokenizer_name,
-        batch_size=config.batch_size,
-        max_length=config.max_sequence_length,
-        shuffle=config.shuffle,
-        num_workers=config.num_workers
+
+    # ── 3. Tokenizar Corpus ───────────────────────────
+    print("── 3. Tokenizando Corpus ────────────────────")
+    token_ids = tokenizer.encode(corpus)
+    print(f"  🔢 Tokens totais : {len(token_ids):,}\n")
+
+    # ── 4. DataLoaders ────────────────────────────────
+    print("── 4. DataLoaders ───────────────────────────")
+    train_dl, val_dl = build_loaders(
+        token_ids,
+        context_len = cfg.model.context_len,
+        batch_size  = cfg.training.batch_size,
+        val_ratio   = cfg.val_ratio,
     )
-    
-    if dataloader is None:
-        print("❌ Failed to create dataloader")
-        return
-    
     print()
-    
-    # =========================================================================
-    # CREATE TRAINER
-    # =========================================================================
-    print("🏋️ Creating trainer...")
-    trainer = Trainer(model, config)
-    print()
-    
-    # =========================================================================
-    # START TRAINING
-    # =========================================================================
-    try:
-        trainer.train(
-            train_dataloader=dataloader,
-            num_epochs=config.num_epochs
-        )
-        
-        # Save final model
-        trainer.save_model("final_model.pth")
-        
-        print("\n✅ Training completed successfully!")
-        print(f"   Model saved to: {config.trained_models_path}/final_model.pth")
-        
-    except KeyboardInterrupt:
-        print("\n\n⚠ Training interrupted by user")
-        print("Saving checkpoint...")
-        trainer.save_checkpoint("interrupted.pth")
-    
-    except Exception as e:
-        print(f"\n❌ Training failed with error: {e}")
-        import traceback
-        traceback.print_exc()
+
+    # ── 5. Modelo ─────────────────────────────────────
+    print("── 5. Modelo ────────────────────────────────")
+    cfg.model.vocab_size = tokenizer.vocab_size
+    best_path = cfg.paths.latest_model
+
+    if cfg.training.resume and os.path.exists(best_path):
+        model = LunaModel.load(best_path, device=str(device))
+        print(f"  ♻️  Retomando de : {best_path}")
+    else:
+        model = LunaModel(cfg.model)
+
+    print(
+        f"  📐 Arquitetura : "
+        f"{cfg.model.num_layers}L × "
+        f"{cfg.model.num_heads}H × "
+        f"{cfg.model.d_model}D"
+    )
+    print(f"  📊 Parâmetros  : {model.num_params():,}\n")
+
+    # ── 6. Treino → Teste → Repita ────────────────────
+    print("── 6. Treino → Teste → Repita ───────────────")
+    trainer = Trainer(
+        model     = model,
+        tokenizer = tokenizer,
+        train_dl  = train_dl,
+        val_dl    = val_dl,
+        cfg       = cfg,
+        device    = device,
+    )
+
+    trainer.fit(
+        epochs       = cfg.training.epochs,
+        test_prompts = cfg.logging.sample_prompts,
+    )
+
+    print("  ✅ Treinamento concluído!")
+    print(f"  💾 Modelo  → {cfg.paths.latest_model}")
+    print(f"  📊 Logs    → {cfg.paths.logs}")
+    print("\n  👉 Próximos passos:")
+    print("     python cephalon_luna/test.py")
+    print("     python cephalon_luna/evaluate.py")
 
 
 if __name__ == "__main__":
