@@ -1,0 +1,86 @@
+# config.yaml
+# ═══════════════════════════════════════════════════════
+#  Cephalon Luna — Configuração Central
+#  Edite aqui para ajustar o comportamento do modelo.
+#  Não é necessário mexer no código Python.
+# ═══════════════════════════════════════════════════════
+
+# ───────────────────────────────────────────────────────
+#  CAMINHOS
+# ───────────────────────────────────────────────────────
+paths:
+  raw_data:        "data/raw"
+  processed_data:  "data/processed"
+  tokenizer:       "data/tokenizer/tokenizer.json"
+  latest_model:    "models/latest/model.pth"
+  checkpoints:     "models/checkpoints"
+  logs:            "models/logs"
+
+# ───────────────────────────────────────────────────────
+#  DADOS
+# ───────────────────────────────────────────────────────
+data:
+  augment:         false
+  val_ratio:       0.1
+
+# ───────────────────────────────────────────────────────
+#  MODELO
+# ───────────────────────────────────────────────────────
+model:
+  vocab_size:      500
+  context_len:     64
+  d_model:         64
+  num_heads:       4
+  num_layers:      2
+  d_ff:            256
+  dropout:         0.05
+
+# ───────────────────────────────────────────────────────
+#  TREINAMENTO
+# ───────────────────────────────────────────────────────
+training:
+  epochs:          5
+  batch_size:      1
+  lr:              1e-3
+  grad_clip:       0.5
+  resume:          false
+
+  scheduler:
+    enabled:       false
+    type:          "none"
+    warmup_epochs: 0
+
+# ───────────────────────────────────────────────────────
+#  GERAÇÃO
+# ───────────────────────────────────────────────────────
+generation:
+  temperature:     0.6
+  top_k:           10
+  max_new_tokens:  50
+
+# ───────────────────────────────────────────────────────
+#  CHECKPOINTS
+# ───────────────────────────────────────────────────────
+checkpoint:
+  save_every_n:    2
+  keep_last_n:     1
+
+# ───────────────────────────────────────────────────────
+#  LOGGING
+# ───────────────────────────────────────────────────────
+logging:
+  log_every_pct:   50
+  show_samples:    true
+  num_samples:     1
+  sample_prompts:
+    - "<usr>Quem é você?<sep>"
+    - "<usr>O que é Python?<sep>"
+    - "<usr>Olá!<sep>"
+    - "<usr>Você tem sentimentos?<sep>"
+
+# ───────────────────────────────────────────────────────
+#  HARDWARE
+# ───────────────────────────────────────────────────────
+hardware:
+  device:          "cpu"
+  seed:            42

@@ -1,1 +1,31 @@
+# --- IGNORE ---
+cephalon_luna/models/checkpoints/*
+cephalon_luna/models/latest/*
+cephalon_luna/models/logs/*
+cephalon_luna/data/processed/*
+cephalon_luna/data/tokenizer/*
+cephalon_luna/data/raw/*
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
 .venv/
+venv/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+cephalon_luna/models/logs/evaluation.png
+*.log
