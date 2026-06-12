@@ -6,6 +6,13 @@ cephalon_luna/data/processed/*
 cephalon_luna/data/tokenizer/*
 cephalon_luna/data/raw/*
 
+!cephalon_luna/models/checkpoints/.gitkeep
+!cephalon_luna/models/latest/.gitkeep
+!cephalon_luna/models/logs/.gitkeep
+!cephalon_luna/data/processed/.gitkeep
+!cephalon_luna/data/tokenizer/.gitkeep
+!cephalon_luna/data/raw/.gitkeep
+
 # Python cache files
 __pycache__/
 *.py[cod]
