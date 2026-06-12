@@ -188,7 +188,7 @@ cephalon_luna/data/raw/*.md           ← conhecimento da Luna
 ### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/seu-usuario/cephalon-luna.git
+git clone https://github.com/WillSantos08/cephalon-luna.git
 cd cephalon-luna
 ```
 
