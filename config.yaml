@@ -27,28 +27,28 @@ data:
 #  MODELO
 # ───────────────────────────────────────────────────────
 model:
-  vocab_size:      500
-  context_len:     64
-  d_model:         64
+  vocab_size:      2000
+  context_len:     128
+  d_model:         128
   num_heads:       4
-  num_layers:      2
-  d_ff:            256
-  dropout:         0.05
+  num_layers:      4
+  d_ff:            512
+  dropout:         0.1
 
 # ───────────────────────────────────────────────────────
 #  TREINAMENTO
 # ───────────────────────────────────────────────────────
 training:
-  epochs:          5
-  batch_size:      1
-  lr:              1e-3
-  grad_clip:       0.5
+  epochs:          20
+  batch_size:      8
+  lr:              3e-4
+  grad_clip:       1.0
   resume:          false
 
   scheduler:
-    enabled:       false
-    type:          "none"
-    warmup_epochs: 0
+    enabled:       true
+    type:          "cosine"
+    warmup_epochs: 5
 
 # ───────────────────────────────────────────────────────
 #  GERAÇÃO
@@ -73,9 +73,9 @@ logging:
   show_samples:    true
   num_samples:     1
   sample_prompts:
-    - "<usr>Quem é você?<sep>"
-    - "<usr>O que é Python?<sep>"
-    - "<usr>Olá!<sep>"
+    - "<usr>Olá cephalon!<sep>"
+    - "<usr>Você sabe que é uma IA?<sep>"
+    - "<usr>Você tem identidade própria?<sep>"
     - "<usr>Você tem sentimentos?<sep>"
 
 # ───────────────────────────────────────────────────────
